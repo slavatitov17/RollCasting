@@ -293,8 +293,8 @@ public:
             const bool volumes = result->scenario.solid_density > 0;
             std::wstring cells[] = {decimal(state.shell_mm, 1), decimal(state.solid_zone, 3),
                 decimal(state.mushy_zone, 3), decimal(state.liquid_zone, 3),
-                volumes ? decimal(state.solid_volume, 3) : L"—",
-                volumes ? decimal(state.liquid_volume, 3) : L"—"};
+                volumes ? decimal(state.solid_volume, 3) : L"-",
+                volumes ? decimal(state.liquid_volume, 3) : L"-"};
             for (int col = 0; col < static_cast<int>(std::size(cells)); ++col) {
                 ListView_SetItemText(summary, z, col + 1, cells[col].data());
             }
@@ -328,6 +328,10 @@ public:
         const auto old = SelectObject(dc, buffer);
         const auto old_font = SelectObject(dc, regular);
         FillRect(dc, &rect, brush);
+        RECT divider{22, 50, rect.right - 20, 51};
+        HBRUSH divider_brush = CreateSolidBrush(RGB(199, 202, 206));
+        FillRect(dc, &divider, divider_brush);
+        DeleteObject(divider_brush);
         SetBkMode(dc, TRANSPARENT);
         if (result) {
             ui::draw_result(dc, {result_left, panels_top, rect.right - 20, rect.bottom - 70},
@@ -449,7 +453,7 @@ private:
             field(0, 249, y, 57, L"Толщина песка", zone.sand_mm);
             field(0, 310, y, 57, L"Толщина опоки", zone.flask_mm);
         }
-        label(L"Время 0 — окончание заполнения формы.\r\nОхлаждение только через боковые стенки.",
+        label(L"Время 0 - окончание заполнения формы.\r\nОхлаждение только через боковые стенки.",
               24, 429, 345, 0, 55);
 
         label(L"Свойства материалов (постоянные)", 24, 104, 346, 1);
@@ -477,8 +481,8 @@ private:
         row(2, 140, L"Начальная температура формы, °C", s.mold_temperature);
         row(2, 175, L"Температура воздуха, °C", s.air_temperature);
         label(L"Коэффициенты теплообмена, Вт/(м²·К)", 24, 221, 346, 2);
-        row(2, 247, L"Контакт металл — песок", s.metal_sand_contact);
-        row(2, 282, L"Контакт песок — опока", s.sand_flask_contact);
+        row(2, 247, L"Контакт металл - песок", s.metal_sand_contact);
+        row(2, 282, L"Контакт песок - опока", s.sand_flask_contact);
         row(2, 317, L"Наружная теплоотдача", s.convection);
         row(2, 368, L"Длительность расчёта, ч", s.hours);
         row(2, 403, L"Максимальный шаг времени, с", s.max_step_s);

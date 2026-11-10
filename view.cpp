@@ -39,6 +39,38 @@ void polyline(HDC dc, const std::vector<POINT>& points, COLORREF color, int styl
     DeleteObject(pen);
 }
 
+// Разрез сифона: серые стенки, светлый проход и нижнее колено под отливкой.
+// Цвет канала схематический, так как металл в литниках не рассчитывается.
+void draw_siphon(HDC dc, int riser, int mouth, int axis, int bottom) {
+    const int throat = mouth + 24;
+    const POINT walls[] = {
+        {riser - 22, mouth}, {riser + 22, mouth}, {riser + 10, throat},
+        {riser + 10, bottom + 9}, {riser + 7, bottom + 16}, {riser, bottom + 20},
+        {axis - 10, bottom + 20}, {axis - 10, bottom}, {axis + 10, bottom},
+        {axis + 10, bottom + 6}, {riser - 14, bottom + 6},
+        {riser - 10, bottom + 2}, {riser - 10, throat}
+    };
+    const POINT channel[] = {
+        {riser - 17, mouth + 1}, {riser + 17, mouth + 1}, {riser + 5, throat},
+        {riser + 5, bottom + 8}, {riser + 2, bottom + 13}, {riser - 2, bottom + 15},
+        {axis - 5, bottom + 15}, {axis - 5, bottom + 1}, {axis + 5, bottom + 1},
+        {axis + 5, bottom + 10}, {riser - 12, bottom + 10},
+        {riser - 5, bottom + 5}, {riser - 5, throat}
+    };
+    HPEN outline = CreatePen(PS_SOLID, 1, muted);
+    HBRUSH wall_brush = CreateSolidBrush(RGB(195, 209, 221));
+    const auto old_pen = SelectObject(dc, outline);
+    const auto old_brush = SelectObject(dc, wall_brush);
+    Polygon(dc, walls, static_cast<int>(std::size(walls)));
+    SelectObject(dc, GetStockObject(NULL_PEN));
+    SelectObject(dc, GetStockObject(WHITE_BRUSH));
+    Polygon(dc, channel, static_cast<int>(std::size(channel)));
+    SelectObject(dc, old_brush);
+    SelectObject(dc, old_pen);
+    DeleteObject(wall_brush);
+    DeleteObject(outline);
+}
+
 // Участки размещаем снизу вверх. Радиусы и высоты масштабируются отдельно,
 // поэтому разрез показывает относительные размеры, но не служит чертежом.
 void draw_casting(HDC dc, RECT r, const View& v, HFONT regular, HFONT bold) {
@@ -85,13 +117,8 @@ void draw_casting(HDC dc, RECT r, const View& v, HFONT regular, HFONT bold) {
                       {2 * axis - edge, last_y}, {edge, last_y}}, ink);
         last_y = top;
     }
-    // Schematic runner, separate from the radial thermal domain.
-    const int riser = r.right - 26;
-    polyline(dc, {{riser - 7, last_y}, {riser, last_y + 12}, {riser + 7, last_y}},
-             muted, PS_SOLID, 2);
-    polyline(dc, {{riser, last_y + 12}, {riser, bottom + 14}, {axis, bottom + 14}, {axis, bottom}},
-             muted, PS_SOLID, 2);
-    text(dc, r.left + 14, r.bottom - 47, L"Сифон и питатель — схема", muted);
+    draw_siphon(dc, r.right - 29, last_y - 11, axis, bottom);
+    text(dc, r.left + 14, r.bottom - 47, L"Сифон и питатель - схема", muted);
     const int legend = r.bottom - 23;
     fill(dc, r.left + 14, legend + 3, 10, 10, solid);
     text(dc, r.left + 30, legend, L"Твёрдая");
@@ -193,7 +220,7 @@ void draw_chart(HDC dc, RECT r, const View& v, HFONT regular, HFONT bold) {
         detail += L"  ·  Дефицит  " + decimal(frame.volume_deficit, 4) + L" м³";
     }
     text(dc, x, bottom + 32, detail, muted);
-    std::wstring note = L"Горизонтальный пунктир — солидус и ликвидус";
+    std::wstring note = L"Горизонтальный пунктир - солидус и ликвидус";
     if (v.baseline && !compare_probe) {
         note = L"Точка датчика вне радиуса базового валка";
     } else if (compare_probe && current.solidification_s && v.baseline->zones[v.zone].solidification_s) {
