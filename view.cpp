@@ -16,6 +16,9 @@ constexpr COLORREF mushy = RGB(238, 178, 55);
 constexpr COLORREF liquid = RGB(216, 87, 59);
 constexpr COLORREF sensor = RGB(0, 126, 111);
 constexpr COLORREF baseline_color = RGB(91, 76, 146);
+constexpr COLORREF mold_lining = RGB(237, 237, 237);
+constexpr COLORREF mold_frame = RGB(212, 213, 215);
+constexpr COLORREF mold_joint = RGB(188, 190, 193);
 
 // Кисть GDI нужна только на время заливки прямоугольника.
 void fill(HDC dc, int x, int y, int w, int h, COLORREF color) {
@@ -57,8 +60,8 @@ void draw_siphon(HDC dc, int riser, int mouth, int axis, int bottom) {
         {axis + 5, bottom + 10}, {riser - 12, bottom + 10},
         {riser - 5, bottom + 5}, {riser - 5, throat}
     };
-    HPEN outline = CreatePen(PS_SOLID, 1, muted);
-    HBRUSH wall_brush = CreateSolidBrush(RGB(195, 209, 221));
+    HPEN outline = CreatePen(PS_SOLID, 1, mold_joint);
+    HBRUSH wall_brush = CreateSolidBrush(mold_frame);
     const auto old_pen = SelectObject(dc, outline);
     const auto old_brush = SelectObject(dc, wall_brush);
     Polygon(dc, walls, static_cast<int>(std::size(walls)));
@@ -69,6 +72,27 @@ void draw_siphon(HDC dc, int riser, int mouth, int axis, int bottom) {
     SelectObject(dc, old_pen);
     DeleteObject(wall_brush);
     DeleteObject(outline);
+}
+
+// Оснастка показана условно: внутренняя облицовка, наружные рамки и стыки.
+// Эти экранные размеры не связаны с толщинами слоёв тепловой сетки.
+void draw_mold_section(HDC dc, int left, int right, int top, int bottom, std::size_t zone) {
+    constexpr int linings[] = {9, 3, 9, 5};
+    constexpr int frames[] = {8, 12, 7, 5};
+    const int height = bottom - top;
+    if (height <= 0) return;
+    const int lining = linings[zone];
+    const int frame = frames[zone];
+    const int wall = lining + frame;
+    fill(dc, left - lining, top, lining, height, mold_lining);
+    fill(dc, right, top, lining, height, mold_lining);
+    fill(dc, left - wall, top, frame, height, mold_frame);
+    fill(dc, right + lining, top, frame, height, mold_frame);
+    const int joint_height = std::min(height, 3);
+    for (int y : {top, bottom - joint_height}) {
+        fill(dc, left - wall - 4, y, frame + 4, joint_height, mold_joint);
+        fill(dc, right + lining, y, frame + 4, joint_height, mold_joint);
+    }
 }
 
 // Участки размещаем снизу вверх. Радиусы и высоты масштабируются отдельно,
@@ -86,10 +110,19 @@ void draw_casting(HDC dc, RECT r, const View& v, HFONT regular, HFONT bold) {
         total_height += z.height_mm;
         largest_diameter = std::max(largest_diameter, z.diameter_mm);
     }
-    const double vertical_scale = (h - 160.0) / total_height;
-    const double radial_scale = (w - 84.0) / largest_diameter;
-    const int axis = r.left + (w - 44) / 2;
-    const int bottom = r.bottom - 70;
+    const double vertical_scale = (h - 182.0) / total_height;
+    const double radial_scale = (w - 126.0) / largest_diameter;
+    const int axis = r.left + (w - 54) / 2;
+    const int bottom = r.bottom - 92;
+    const int riser = r.right - 29;
+    const int lower_radius = static_cast<int>(std::lround(s.zones.front().diameter_mm * radial_scale / 2));
+    const int lower_left = axis - lower_radius - 17;
+    // Нижняя опока охватывает подводящий канал и опирается на подопочную плиту.
+    fill(dc, lower_left, bottom, riser + 17 - lower_left, 22, mold_lining);
+    fill(dc, lower_left, bottom, 7, 22, mold_frame);
+    fill(dc, riser + 10, bottom, 7, 22, mold_frame);
+    fill(dc, r.left + 14, bottom + 22, w - 23, 7, mold_frame);
+    fill(dc, r.left + 14, bottom + 28, w - 23, 1, mold_joint);
     int last_y = bottom;
     double elevation = 0;
     for (std::size_t z = 0; z < casting::zone_count; ++z) {
@@ -101,6 +134,11 @@ void draw_casting(HDC dc, RECT r, const View& v, HFONT regular, HFONT bold) {
         const int edge = axis - static_cast<int>(std::lround(radius));
         if (z == v.zone) {
             fill(dc, r.left + 10, top, w - 20, std::max(1, last_y - top), RGB(228, 239, 249));
+        }
+        draw_mold_section(dc, edge, 2 * axis - edge, top, last_y, z);
+        // Хомуты стояка совпадают по высоте со стыками рамок.
+        if (z < casting::zone_count - 1) {
+            fill(dc, riser - 15, top, 30, 4, mold_frame);
         }
         const auto n = static_cast<int>(frame.temperature.size());
         // Каждое кольцо отображается полосой с двух сторон от оси.
@@ -117,8 +155,8 @@ void draw_casting(HDC dc, RECT r, const View& v, HFONT regular, HFONT bold) {
                       {2 * axis - edge, last_y}, {edge, last_y}}, ink);
         last_y = top;
     }
-    draw_siphon(dc, r.right - 29, last_y - 11, axis, bottom);
-    text(dc, r.left + 14, r.bottom - 47, L"Сифон и питатель - схема", muted);
+    draw_siphon(dc, riser, last_y - 11, axis, bottom);
+    text(dc, r.left + 14, r.bottom - 47, L"Оснастка и сифон - схема", muted);
     const int legend = r.bottom - 23;
     fill(dc, r.left + 14, legend + 3, 10, 10, solid);
     text(dc, r.left + 30, legend, L"Твёрдая");
