@@ -1,0 +1,14 @@
+roll-casting 1
+title "Демонстрационный валок"
+source "Условные значения для проверки программы"
+zone 620 850 110 25
+zone 1450 2000 90 30
+zone 680 900 110 25
+zone 780 500 150 25
+material 7000 750 30
+material 1600 1050 0.9
+material 7850 500 45
+phase 7450 1370 1460 260000
+initial 1530 25 25
+transfer 350 300 18
+solver 60 30 72
